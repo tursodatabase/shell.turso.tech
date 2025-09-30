@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link href="/src/style.css" rel="stylesheet" />
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.css"
+        />
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/theme/default.css"
+        />
+        <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/sql/sql.js"></script>
+        <style>
+            .CodeMirror {
+                height: 100%;
+                font-family:
+                    ui-monospace, SFMono-Regular, "SF Mono", Consolas,
+                    "Liberation Mono", Menlo, monospace;
+                font-size: 14px;
+                border: none;
+                background: white;
+            }
+            .CodeMirror-focused .CodeMirror-cursor {
+                border-left: 1px solid #000;
+            }
+            .CodeMirror-gutters {
+                border-right: 1px solid #e5e7eb;
+                background: #f9fafb;
+                padding-right: 15px;
+            }
+            .CodeMirror-linenumber {
+                color: #6b7280;
+            }
+            .run-gutter {
+                width: 20px;
+                cursor: pointer;
+            }
+            .run-marker {
+                color: #6b7280;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 16px;
+                height: 16px;
+                margin-left: 2px;
+            }
+            .run-marker:hover {
+                color: #000;
+            }
+            .run-marker svg {
+                width: 14px;
+                height: 14px;
+            }
+        </style>
+        <title>Turso Shell</title>
+    </head>
+    <body class="bg-white h-screen font-mono">
+        <div id="app" class="h-full flex flex-col">
+            <main class="flex-1 flex overflow-hidden">
+                <div class="flex-1 flex flex-col">
+                    <div
+                        class="px-4 py-2 bg-gray-100 flex items-center justify-between border-b border-[#e5e7eb]"
+                    >
+                        <div class="flex items-center gap-4 h-10">
+                            <svg
+                                class="size-5"
+                                viewBox="0 0 201 170"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <path
+                                    d="M200.035 48.61C195.365 20.67 170.875 0 170.875 0V30.78L156.335 34.53L147.225 23.56L142.415 33.02C132.495 30.32 118.835 28.58 100.045 28.58C81.2549 28.58 67.5949 30.33 57.6749 33.02L52.8649 23.56L43.7549 34.53L29.2149 30.78V0C29.2149 0 4.72493 20.67 0.0549316 48.61L32.1949 59.73C33.2449 79.16 41.9849 131.61 44.4849 136.37C47.1449 141.44 61.2649 155.93 72.3149 161.5C72.3149 161.5 76.3149 157.27 78.7549 153.54C81.8549 157.19 97.8649 169.99 100.055 169.99C102.245 169.99 118.255 157.2 121.355 153.54C123.795 157.27 127.795 161.5 127.795 161.5C138.845 155.93 152.965 141.44 155.625 136.37C158.125 131.61 166.865 79.16 167.915 59.73L200.055 48.61H200.035ZM153.845 93.35L132.095 95.29L134.005 121.96C134.005 121.96 120.775 132.91 100.045 132.91C79.3149 132.91 66.0849 121.96 66.0849 121.96L67.9949 95.29L46.2449 93.35L42.5249 63.31L78.5749 75.79L75.7749 113.18C82.4749 114.88 89.5249 116.57 100.055 116.57C110.585 116.57 117.625 114.88 124.325 113.18L121.525 75.79L157.575 63.31L153.855 93.35H153.845Z"
+                                    fill="#000"
+                                />
+                            </svg>
+                            <span class="text-sm text-black/60">file:</span>
+                            <input
+                                id="database"
+                                class="bg-transparent text-sm font-medium text-black focus:outline-none"
+                                value="turso.db"
+                                placeholder="filename.db"
+                                required
+                            />
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <select
+                                id="version"
+                                name="version"
+                                class="w-32 p-1 border border-slate-300 bg-slate-100 text-sm rounded focus:outline-none focus:ring-1 focus:ring-slate-400"
+                            >
+                                <option value="">Loading...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="sql-editor" class="w-full h-full"></div>
+                </div>
+
+                <div class="w-px bg-[#e5e7eb]"></div>
+
+                <div class="flex-1 flex flex-col">
+                    <div
+                        class="px-4 py-2 bg-gray-100 flex items-center justify-between border-b border-[#e5e7eb]"
+                    >
+                        <div class="flex items-center gap-2 h-10">
+                            <span class="text-sm font-medium text-black"
+                                >Query Results</span
+                            >
+                            <span
+                                id="dimensions"
+                                class="text-xs text-gray-500"
+                            ></span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div id="status" class="flex items-center gap-2">
+                                <span
+                                    class="w-2 h-2 bg-green-500 rounded-full"
+                                ></span>
+                                <span class="text-sm text-gray-600">Ready</span>
+                            </div>
+                            <span id="row-count" class="text-xs text-gray-600"
+                                >0 rows</span
+                            >
+                        </div>
+                    </div>
+
+                    <div class="flex-1 flex flex-col overflow-hidden p-4">
+                        <div
+                            id="error"
+                            class="bg-red-50 text-red-700 text-sm hidden"
+                        ></div>
+                        <div class="flex-1 overflow-auto">
+                            <table
+                                id="table"
+                                class="w-full text-sm border-collapse hidden"
+                            >
+                                <thead class="bg-gray-50">
+                                    <tr></tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <div class="sr-only" aria-live="polite" id="live"></div>
+
+        <script type="module">
+            let connect;
+
+            async function loadTursoLibrary(version) {
+                const script = document.createElement("script");
+                script.type = "module";
+                script.textContent = `
+                    import { connect as tursoConnect } from 'https://unpkg.com/@tursodatabase/database-browser@${version}/bundle/main.es.js';
+                    window.__tursoConnect = tursoConnect;
+                `;
+                document.head.appendChild(script);
+
+                // Wait for the library to load
+                await new Promise((resolve) => {
+                    const checkLoaded = setInterval(() => {
+                        if (window.__tursoConnect) {
+                            connect = window.__tursoConnect;
+                            clearInterval(checkLoaded);
+                            resolve();
+                        }
+                    }, 50);
+                });
+            }
+
+            (async function () {
+                const $ = (sel) => document.querySelector(sel);
+                const runBtn = $("#run");
+                const statusEl = $("#status");
+                const liveEl = $("#live");
+                const dimensionsEl = $("#dimensions");
+                const errEl = $("#error");
+                const thead = $("#table thead tr");
+                const tbody = $("#table tbody");
+                const tableEl = $("#table");
+                const rowCountEl = $("#row-count");
+
+                const editor = CodeMirror(
+                    document.getElementById("sql-editor"),
+                    {
+                        value: `CREATE TABLE IF NOT EXISTS movies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    year INTEGER,
+    genre TEXT,
+    rating REAL
+);
+
+CREATE TABLE IF NOT EXISTS actors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    movie_id INTEGER,
+    role TEXT,
+    FOREIGN KEY (movie_id) REFERENCES movies(id)
+);
+
+INSERT INTO movies (title, year, genre, rating) VALUES
+    ('The Matrix', 1999, 'Sci-Fi', 8.7),
+    ('Inception', 2010, 'Sci-Fi', 8.8),
+    ('Pulp Fiction', 1994, 'Crime', 8.9),
+    ('The Godfather', 1972, 'Crime', 9.2);
+
+INSERT INTO actors (name, movie_id, role) VALUES
+    ('Keanu Reeves', 1, 'Neo'),
+    ('Laurence Fishburne', 1, 'Morpheus'),
+    ('Leonardo DiCaprio', 2, 'Dom Cobb'),
+    ('Marion Cotillard', 2, 'Mal'),
+    ('John Travolta', 3, 'Vincent Vega'),
+    ('Samuel L. Jackson', 3, 'Jules Winnfield'),
+    ('Marlon Brando', 4, 'Vito Corleone');
+
+-- JOIN and AS aliases
+SELECT
+    m.title AS movie_title,
+    m.year AS release_year,
+    m.genre,
+    m.rating AS imdb_rating,
+    COUNT(a.id) AS cast_count,
+    GROUP_CONCAT(a.name, ', ') AS main_cast
+FROM movies m
+LEFT JOIN actors a ON m.id = a.movie_id
+GROUP BY m.id, m.title, m.year, m.genre, m.rating
+ORDER BY m.rating DESC;
+
+-- Find movies by decade
+SELECT
+    CASE
+        WHEN year < 1980 THEN '1970s'
+        WHEN year < 1990 THEN '1980s'
+        WHEN year < 2000 THEN '1990s'
+        WHEN year < 2010 THEN '2000s'
+        ELSE '2010s+'
+    END AS decade,
+    COUNT(*) AS movie_count,
+    AVG(rating) AS avg_rating
+FROM movies
+GROUP BY decade
+ORDER BY decade;`,
+                        mode: "text/x-sql",
+                        theme: "default",
+                        lineNumbers: true,
+                        lineWrapping: true,
+                        indentWithTabs: false,
+                        indentUnit: 2,
+                        tabSize: 2,
+                        gutters: ["run-gutter", "CodeMirror-linenumbers"],
+                        extraKeys: {
+                            "Ctrl-Enter": function () {
+                                runCurrentStatement();
+                            },
+                            "Cmd-Enter": function () {
+                                runCurrentStatement();
+                            },
+                        },
+                    },
+                );
+
+                // Parse SQL statements from the editor
+                function parseStatements(text) {
+                    const statements = [];
+                    const lines = text.split("\n");
+                    let current = "";
+                    let actualStartLine = null;
+
+                    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+                        const line = lines[lineNum];
+                        const trimmedLine = line.trim();
+
+                        // Track the actual start line (first non-empty line)
+                        if (trimmedLine && actualStartLine === null) {
+                            actualStartLine = lineNum;
+                        }
+
+                        current += line + "\n";
+
+                        if (line.includes(";")) {
+                            const trimmed = current.trim();
+                            if (trimmed && actualStartLine !== null) {
+                                statements.push({
+                                    sql: trimmed,
+                                    startLine: actualStartLine,
+                                    endLine: lineNum,
+                                });
+                            }
+                            current = "";
+                            actualStartLine = null;
+                        }
+                    }
+
+                    // Handle last statement without semicolon
+                    const trimmed = current.trim();
+                    if (trimmed && actualStartLine !== null) {
+                        statements.push({
+                            sql: trimmed,
+                            startLine: actualStartLine,
+                            endLine: lines.length - 1,
+                        });
+                    }
+
+                    return statements;
+                }
+
+                // Update run markers in the gutter
+                function updateRunMarkers() {
+                    editor.clearGutter("run-gutter");
+                    const text = editor.getValue();
+                    const statements = parseStatements(text);
+
+                    statements.forEach((stmt) => {
+                        const marker = document.createElement("div");
+                        marker.className = "run-marker";
+                        marker.innerHTML =
+                            '<svg fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>';
+                        marker.title = "Run this statement";
+                        marker.onclick = () => run(stmt.sql);
+                        editor.setGutterMarker(
+                            stmt.startLine,
+                            "run-gutter",
+                            marker,
+                        );
+                    });
+                }
+
+                // Update markers on content change
+                editor.on("change", updateRunMarkers);
+                updateRunMarkers();
+
+                // Run the statement at the current cursor position
+                function runCurrentStatement() {
+                    const cursor = editor.getCursor();
+                    const text = editor.getValue();
+                    const statements = parseStatements(text);
+
+                    // Find the statement that contains the cursor line
+                    for (const stmt of statements) {
+                        if (
+                            cursor.line >= stmt.startLine &&
+                            cursor.line <= stmt.endLine
+                        ) {
+                            run(stmt.sql);
+                            return;
+                        }
+                    }
+
+                    // If no statement found, run all (fallback behavior)
+                    run(text);
+                }
+
+                function fmt(v) {
+                    if (v === null || v === undefined) return "NULL";
+                    if (typeof v === "object") {
+                        try {
+                            return JSON.stringify(v);
+                        } catch {
+                            return String(v);
+                        }
+                    }
+                    return String(v);
+                }
+
+                function clearTable() {
+                    thead.innerHTML = "";
+                    tbody.innerHTML = "";
+                    tableEl.classList.add("hidden");
+                }
+
+                function renderTable(result) {
+                    clearTable();
+                    const { columns = [], rows = [] } = result || {};
+
+                    if (columns.length > 0) {
+                        tableEl.classList.remove("hidden");
+
+                        for (const name of columns) {
+                            const th = document.createElement("th");
+                            th.textContent = String(name);
+                            th.className =
+                                "px-3 py-2 text-left font-medium text-black bg-gray-50";
+                            thead.appendChild(th);
+                        }
+
+                        const frag = document.createDocumentFragment();
+                        for (const r of rows) {
+                            const tr = document.createElement("tr");
+                            tr.className = "hover:bg-gray-50";
+                            for (let i = 0; i < columns.length; i++) {
+                                const td = document.createElement("td");
+                                td.textContent = fmt(r[i] ?? null);
+                                td.className = "px-3 py-2 text-black";
+                                tr.appendChild(td);
+                            }
+                            frag.appendChild(tr);
+                        }
+                        tbody.appendChild(frag);
+                    }
+
+                    if (rows.length > 0 && columns.length > 0) {
+                        dimensionsEl.textContent = `(${rows.length}×${columns.length})`;
+                    } else {
+                        dimensionsEl.textContent = "";
+                    }
+
+                    rowCountEl.textContent = `${rows.length} rows`;
+                }
+
+                var db = null;
+                var path = null;
+                async function run(sql) {
+                    const name = document
+                        .getElementById("database")
+                        .value.trim();
+                    if (!name) {
+                        alert(
+                            "Please enter a database filename before running the query.",
+                        );
+                        return;
+                    }
+                    if (name != path) {
+                        path = name;
+                        console.info(path, name);
+                        if (db != null) {
+                            await db.close();
+                        }
+                        db = await connect(path);
+                    }
+                    errEl.classList.add("hidden");
+                    errEl.textContent = "";
+                    statusEl.innerHTML =
+                        '<span class="w-2 h-2 bg-yellow-500 rounded-full"></span><span class="text-sm text-gray-600">Running…</span>';
+
+                    try {
+                        const stmt = await db.prepare(sql);
+                        const columns = (await stmt.columns()).map(
+                            (x) => x.name,
+                        );
+                        const rows = await stmt.all();
+                        const res = {
+                            columns: columns,
+                            rows: rows.map((r) => columns.map((c) => r[c])),
+                        };
+                        renderTable(res);
+                        statusEl.innerHTML = `<span class="w-2 h-2 bg-green-500 rounded-full"></span><span class="text-sm text-gray-600">OK</span>`;
+                    } catch (e) {
+                        clearTable();
+                        statusEl.innerHTML =
+                            '<span class="w-2 h-2 bg-red-500 rounded-full"></span><span class="text-sm text-gray-600">ERROR</span>';
+                        const msg =
+                            (e && (e.message || e.toString())) ||
+                            "Unknown error";
+                        errEl.textContent = "ERROR: " + msg;
+                        errEl.classList.remove("hidden");
+                        liveEl.textContent = "Query failed.";
+                        dimensionsEl.textContent = "";
+                        rowCountEl.textContent = "0 rows";
+                    }
+                }
+
+                // Fetch and populate version selector
+                async function loadVersions() {
+                    try {
+                        const response = await fetch(
+                            "https://registry.npmjs.org/@tursodatabase/database-browser",
+                        );
+                        const data = await response.json();
+
+                        const versionSelect =
+                            document.getElementById("version");
+                        const distTags = data["dist-tags"] || {};
+                        const versions = Object.keys(
+                            data.versions || {},
+                        ).reverse();
+
+                        versionSelect.innerHTML = "";
+
+                        // Tags optgroup
+                        const tagsGroup = document.createElement("optgroup");
+                        tagsGroup.label = "Tags";
+
+                        if (
+                            distTags.next &&
+                            distTags.next !== distTags.latest
+                        ) {
+                            const nextOption = document.createElement("option");
+                            nextOption.value = distTags.next;
+                            nextOption.textContent = `next (${distTags.next})`;
+                            nextOption.selected = true;
+                            tagsGroup.appendChild(nextOption);
+                        }
+
+                        if (distTags.latest) {
+                            const latestOption =
+                                document.createElement("option");
+                            latestOption.value = distTags.latest;
+                            latestOption.textContent = `latest (${distTags.latest})`;
+                            tagsGroup.appendChild(latestOption);
+                        }
+
+                        versionSelect.appendChild(tagsGroup);
+
+                        // Versions optgroup
+                        const versionsGroup =
+                            document.createElement("optgroup");
+                        versionsGroup.label = "Versions";
+
+                        versions.forEach((version) => {
+                            const option = document.createElement("option");
+                            option.value = version;
+                            option.textContent = version;
+                            versionsGroup.appendChild(option);
+                        });
+
+                        versionSelect.appendChild(versionsGroup);
+
+                        // Load the selected version
+                        await loadTursoLibrary(versionSelect.value);
+                    } catch (error) {
+                        console.error("Failed to load versions:", error);
+                        document.getElementById("version").innerHTML =
+                            '<option value="">Error loading versions</option>';
+                    }
+                }
+
+                // Handle version change
+                document
+                    .getElementById("version")
+                    .addEventListener("change", async (e) => {
+                        const newVersion = e.target.value;
+                        if (newVersion) {
+                            statusEl.innerHTML =
+                                '<span class="w-2 h-2 bg-yellow-500 rounded-full"></span><span class="text-sm text-gray-600">Loading library...</span>';
+
+                            // Close existing db connection if open
+                            if (db != null) {
+                                try {
+                                    await db.close();
+                                } catch (e) {
+                                    console.error("Error closing database:", e);
+                                }
+                                db = null;
+                                path = null;
+                            }
+
+                            await loadTursoLibrary(newVersion);
+
+                            // Reconnect to the database with new version
+                            const name = document
+                                .getElementById("database")
+                                .value.trim();
+                            if (name) {
+                                try {
+                                    db = await connect(name);
+                                    path = name;
+                                    statusEl.innerHTML =
+                                        '<span class="w-2 h-2 bg-green-500 rounded-full"></span><span class="text-sm text-gray-600">Ready</span>';
+                                } catch (e) {
+                                    console.error(
+                                        "Error reconnecting database:",
+                                        e,
+                                    );
+                                    statusEl.innerHTML =
+                                        '<span class="w-2 h-2 bg-red-500 rounded-full"></span><span class="text-sm text-gray-600">Error</span>';
+                                }
+                            } else {
+                                statusEl.innerHTML =
+                                    '<span class="w-2 h-2 bg-green-500 rounded-full"></span><span class="text-sm text-gray-600">Ready</span>';
+                            }
+                        }
+                    });
+
+                await loadVersions();
+                run(editor.getValue());
+            })();
+        </script>
+    </body>
+</html>
