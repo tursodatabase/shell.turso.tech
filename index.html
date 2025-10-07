@@ -160,7 +160,7 @@
                 const script = document.createElement("script");
                 script.type = "module";
                 script.textContent = `
-                    import { connect as tursoConnect } from 'https://unpkg.com/@tursodatabase/database-browser@${version}/bundle/main.es.js';
+                    import { connect as tursoConnect } from 'https://unpkg.com/@tursodatabase/database-wasm@${version}/bundle/main.es.js';
                     window.__tursoConnect = tursoConnect;
                 `;
                 document.head.appendChild(script);
@@ -473,7 +473,7 @@ ORDER BY decade;`,
                 async function loadVersions() {
                     try {
                         const response = await fetch(
-                            "https://registry.npmjs.org/@tursodatabase/database-browser",
+                            "https://registry.npmjs.org/@tursodatabase/database-wasm",
                         );
                         const data = await response.json();
 
