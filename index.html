@@ -498,6 +498,15 @@ ORDER BY decade;`,
                         const tagsGroup = document.createElement("optgroup");
                         tagsGroup.label = "Tags";
 
+                        if (distTags.latest) {
+                            const latestOption =
+                                document.createElement("option");
+                            latestOption.value = distTags.latest;
+                            latestOption.textContent = `latest (${distTags.latest})`;
+                            latestOption.selected = true;
+                            tagsGroup.appendChild(latestOption);
+                        }
+
                         if (
                             distTags.next &&
                             distTags.next !== distTags.latest
@@ -505,16 +514,7 @@ ORDER BY decade;`,
                             const nextOption = document.createElement("option");
                             nextOption.value = distTags.next;
                             nextOption.textContent = `next (${distTags.next})`;
-                            nextOption.selected = true;
                             tagsGroup.appendChild(nextOption);
-                        }
-
-                        if (distTags.latest) {
-                            const latestOption =
-                                document.createElement("option");
-                            latestOption.value = distTags.latest;
-                            latestOption.textContent = `latest (${distTags.latest})`;
-                            tagsGroup.appendChild(latestOption);
                         }
 
                         versionSelect.appendChild(tagsGroup);
