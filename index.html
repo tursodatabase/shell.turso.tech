@@ -87,14 +87,7 @@
                                     fill="#000"
                                 />
                             </svg>
-                            <span class="text-sm text-black/60">file:</span>
-                            <input
-                                id="database"
-                                class="bg-transparent text-sm font-medium text-black focus:outline-none"
-                                value="turso.db"
-                                placeholder="filename.db"
-                                required
-                            />
+                            <span class="text-sm font-medium text-black">Turso Shell</span>
                         </div>
                         <div class="flex items-center gap-2">
                             <select
@@ -104,10 +97,18 @@
                             >
                                 <option value="">Loading...</option>
                             </select>
+                            <button
+                                id="run-all"
+                                class="px-3 py-1 border border-slate-300 bg-slate-100 text-sm rounded hover:bg-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                            >Run All</button>
+                            <button
+                                id="share"
+                                class="px-3 py-1 border border-slate-300 bg-slate-100 text-sm rounded hover:bg-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                            >Share</button>
                         </div>
                     </div>
 
-                    <div id="sql-editor" class="w-full h-full"></div>
+                    <div id="sql-editor" class="w-full flex-1 min-h-0"></div>
                 </div>
 
                 <div class="w-px bg-[#e5e7eb]"></div>
@@ -165,24 +166,9 @@
             let connect;
 
             async function loadTursoLibrary(version) {
-                const script = document.createElement("script");
-                script.type = "module";
-                script.textContent = `
-                    import { connect as tursoConnect } from 'https://unpkg.com/@tursodatabase/database-wasm@${version}/bundle/main.es.js';
-                    window.__tursoConnect = tursoConnect;
-                `;
-                document.head.appendChild(script);
-
-                // Wait for the library to load
-                await new Promise((resolve) => {
-                    const checkLoaded = setInterval(() => {
-                        if (window.__tursoConnect) {
-                            connect = window.__tursoConnect;
-                            clearInterval(checkLoaded);
-                            resolve();
-                        }
-                    }, 50);
-                });
+                const url = `https://unpkg.com/@tursodatabase/database-wasm@${version}/bundle/main.es.js`;
+                const module = await import(url);
+                connect = module.connect;
             }
 
             (async function () {
@@ -197,67 +183,27 @@
                 const tableEl = $("#table");
                 const rowCountEl = $("#row-count");
 
+                // Decode share params from URL hash (#q=<base64 JSON>)
+                function getShareParams() {
+                    const hash = window.location.hash;
+                    if (!hash) return {};
+                    const params = new URLSearchParams(hash.slice(1));
+                    const encoded = params.get("q");
+                    if (!encoded) return {};
+                    try {
+                        return JSON.parse(decodeURIComponent(escape(atob(encoded))));
+                    } catch {
+                        return {};
+                    }
+                }
+
+                const shareParams = getShareParams();
+                const defaultSQL = shareParams.sql || `select 'hello, turso';`;
+
                 const editor = CodeMirror(
                     document.getElementById("sql-editor"),
                     {
-                        value: `CREATE TABLE IF NOT EXISTS movies (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    year INTEGER,
-    genre TEXT,
-    rating REAL
-);
-
-CREATE TABLE IF NOT EXISTS actors (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    movie_id INTEGER,
-    role TEXT,
-    FOREIGN KEY (movie_id) REFERENCES movies(id)
-);
-
-INSERT INTO movies (title, year, genre, rating) VALUES
-    ('The Matrix', 1999, 'Sci-Fi', 8.7),
-    ('Inception', 2010, 'Sci-Fi', 8.8),
-    ('Pulp Fiction', 1994, 'Crime', 8.9),
-    ('The Godfather', 1972, 'Crime', 9.2);
-
-INSERT INTO actors (name, movie_id, role) VALUES
-    ('Keanu Reeves', 1, 'Neo'),
-    ('Laurence Fishburne', 1, 'Morpheus'),
-    ('Leonardo DiCaprio', 2, 'Dom Cobb'),
-    ('Marion Cotillard', 2, 'Mal'),
-    ('John Travolta', 3, 'Vincent Vega'),
-    ('Samuel L. Jackson', 3, 'Jules Winnfield'),
-    ('Marlon Brando', 4, 'Vito Corleone');
-
--- JOIN and AS aliases
-SELECT
-    m.title AS movie_title,
-    m.year AS release_year,
-    m.genre,
-    m.rating AS imdb_rating,
-    COUNT(a.id) AS cast_count,
-    GROUP_CONCAT(a.name, ', ') AS main_cast
-FROM movies m
-LEFT JOIN actors a ON m.id = a.movie_id
-GROUP BY m.id, m.title, m.year, m.genre, m.rating
-ORDER BY m.rating DESC;
-
--- Find movies by decade
-SELECT
-    CASE
-        WHEN year < 1980 THEN '1970s'
-        WHEN year < 1990 THEN '1980s'
-        WHEN year < 2000 THEN '1990s'
-        WHEN year < 2010 THEN '2000s'
-        ELSE '2010s+'
-    END AS decade,
-    COUNT(*) AS movie_count,
-    AVG(rating) AS avg_rating
-FROM movies
-GROUP BY decade
-ORDER BY decade;`,
+                        value: defaultSQL,
                         mode: "text/x-sql",
                         theme: "default",
                         lineNumbers: true,
@@ -426,24 +372,9 @@ ORDER BY decade;`,
                 }
 
                 var db = null;
-                var path = null;
                 async function run(sql) {
-                    const name = document
-                        .getElementById("database")
-                        .value.trim();
-                    if (!name) {
-                        alert(
-                            "Please enter a database filename before running the query.",
-                        );
-                        return;
-                    }
-                    if (name != path) {
-                        path = name;
-                        console.info(path, name);
-                        if (db != null) {
-                            await db.close();
-                        }
-                        db = await connect(path);
+                    if (db == null) {
+                        db = await connect(":memory:");
                     }
                     errEl.classList.add("hidden");
                     errEl.textContent = "";
@@ -462,6 +393,7 @@ ORDER BY decade;`,
                         };
                         renderTable(res);
                         statusEl.innerHTML = `<span class="w-2 h-2 bg-green-500 rounded-full"></span><span class="text-sm text-gray-600">OK</span>`;
+                        return true;
                     } catch (e) {
                         clearTable();
                         statusEl.innerHTML =
@@ -474,8 +406,19 @@ ORDER BY decade;`,
                         liveEl.textContent = "Query failed.";
                         dimensionsEl.textContent = "";
                         rowCountEl.textContent = "0 rows";
+                        return false;
                     }
                 }
+
+                async function runAll() {
+                    const statements = parseStatements(editor.getValue());
+                    for (const stmt of statements) {
+                        const ok = await run(stmt.sql);
+                        if (!ok) return;
+                    }
+                }
+
+                document.getElementById("run-all").addEventListener("click", runAll);
 
                 // Fetch and populate version selector
                 async function loadVersions() {
@@ -533,6 +476,12 @@ ORDER BY decade;`,
 
                         versionSelect.appendChild(versionsGroup);
 
+                        // Select shared version if present and valid
+                        if (shareParams.version) {
+                            const opt = versionSelect.querySelector(`option[value="${CSS.escape(shareParams.version)}"]`);
+                            if (opt) versionSelect.value = shareParams.version;
+                        }
+
                         // Load the selected version
                         await loadTursoLibrary(versionSelect.value);
                     } catch (error) {
@@ -551,7 +500,6 @@ ORDER BY decade;`,
                             statusEl.innerHTML =
                                 '<span class="w-2 h-2 bg-yellow-500 rounded-full"></span><span class="text-sm text-gray-600">Loading library...</span>';
 
-                            // Close existing db connection if open
                             if (db != null) {
                                 try {
                                     await db.close();
@@ -559,38 +507,40 @@ ORDER BY decade;`,
                                     console.error("Error closing database:", e);
                                 }
                                 db = null;
-                                path = null;
                             }
 
-                            await loadTursoLibrary(newVersion);
-
-                            // Reconnect to the database with new version
-                            const name = document
-                                .getElementById("database")
-                                .value.trim();
-                            if (name) {
-                                try {
-                                    db = await connect(name);
-                                    path = name;
-                                    statusEl.innerHTML =
-                                        '<span class="w-2 h-2 bg-green-500 rounded-full"></span><span class="text-sm text-gray-600">Ready</span>';
-                                } catch (e) {
-                                    console.error(
-                                        "Error reconnecting database:",
-                                        e,
-                                    );
-                                    statusEl.innerHTML =
-                                        '<span class="w-2 h-2 bg-red-500 rounded-full"></span><span class="text-sm text-gray-600">Error</span>';
-                                }
-                            } else {
+                            try {
+                                await loadTursoLibrary(newVersion);
                                 statusEl.innerHTML =
                                     '<span class="w-2 h-2 bg-green-500 rounded-full"></span><span class="text-sm text-gray-600">Ready</span>';
+                            } catch (e) {
+                                console.error("Error loading library:", e);
+                                statusEl.innerHTML =
+                                    '<span class="w-2 h-2 bg-red-500 rounded-full"></span><span class="text-sm text-gray-600">Error</span>';
                             }
                         }
                     });
 
+                // Share button
+                const shareBtn = document.getElementById("share");
+                shareBtn.addEventListener("click", async () => {
+                    const payload = {
+                        sql: editor.getValue(),
+                        version: document.getElementById("version").value,
+                    };
+                    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+                    window.location.hash = "q=" + encoded;
+                    try {
+                        await navigator.clipboard.writeText(window.location.href);
+                        shareBtn.textContent = "Copied!";
+                    } catch {
+                        shareBtn.textContent = "Copied!";
+                    }
+                    setTimeout(() => { shareBtn.textContent = "Share"; }, 1500);
+                });
+
                 await loadVersions();
-                run(editor.getValue());
+                runAll();
             })();
         </script>
     </body>
